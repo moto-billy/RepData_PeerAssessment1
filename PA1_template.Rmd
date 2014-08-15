@@ -1,20 +1,119 @@
 # Reproducible Research: Peer Assessment 1
-
+```{r libraries}
+# Required Libraries:
+library(plyr)
+library(lattice)
+```
 
 ## Loading and preprocessing the data
+```{r readingData, echo = TRUE}
+# you need to unzip the data in a sub-directory named "Repro"
+act<- read.csv("./Repro/activity.csv", header=TRUE, sep=",")
+dim(act)
+names(act)
+length(unique(act$date)) # there are 61 days in the dataset.
+table(act$date, useNA="ifany") # there are 288 observations related to each day.
+sapply(act[1,], class) # Obtaining the class of each variable.
 
-
+#changing the class of the variable "steps" to be Numeric:
+act$steps <- as.numeric(act$steps) 
+#changing the class of the variable "interval" to be Numeric:
+act$interval <- as.numeric(act$interval) 
+actData<- act[complete.cases(act),] # new data frame after removing NAs.
+```
 
 ## What is mean total number of steps taken per day?
+```{r Hist mean/median of steps/day, echo = TRUE}
+# obtaining the total number of steps for each day:
+sm<- ddply(actData, c("date"), function (x) apply(x[1], 2, sum)) 
+hist(sm$steps, xlab= "Total Number of Steps/Day",
+     main="Histogram of the Total Number of Steps Taken Each Day",
+     col= "red")
 
-
+# obtaining the mean of total steps:
+mean(sm$steps, na.rm=TRUE) # 10766.19
+# obtaining the median of total steps:
+median(sm$steps, na.rm=TRUE) # 10765
+```
 
 ## What is the average daily activity pattern?
+```{r time series plot, echo = TRUE}
+# Calculating the mean of steps related to each interval:
+mnsteps <- ddply(actData, c("interval"), function (x) apply(x[1], 2, mean))
 
-
+# Creating the panel plot containing a time series plot of the 5-minute interval 
+# and the average number of steps taken, averaged across all days:
+xyplot(mnsteps$steps ~ mnsteps$interval, 
+       type= "l", 
+       ylab="Mean Steps",
+       xlab= "Intervals", 
+       main="Plot of Intervals vs. Mean Steps",
+       lwd=1.5)
+max(mnsteps$steps) # what is the maximum amount of mean steps
+# obtaining the interval related to the maximum of mean step (interval 835):
+mnsteps[mnsteps$steps==max(mnsteps$steps),] 
+```
 
 ## Imputing missing values
+```{r NAs, echo = TRUE}
+sum(is.na(act$interval)) # without NA.
+sum(is.na(act$date)) # without NA.
+sum(is.na(act$steps)) # There are 2304 rows with NAs.
 
+#replacing the steps of the rows having NAs with the mean steps 
+#for each 5-min interval across the all data:
+mnsteps <- ddply(actData, c("interval"), function (x) apply(x[1], 2, mean))
+newData<- act
+newData[1:288, 1] <- mnsteps$steps 
+newData[2017:2304, 1]<- mnsteps$steps
+newData[8929:9216, 1]<- mnsteps$steps
+newData[9793:10080, 1]<- mnsteps$steps
+newData[11233:11520, 1]<- mnsteps$steps
+newData[11521:11808, 1]<- mnsteps$steps
+newData[12673:12960, 1]<- mnsteps$steps
+newData[17281:17568, 1]<- mnsteps$steps
+sum(is.na(newData)) # There is no NA.
+#Calculating the sum of steps related to each day:
+newsm<- ddply(newData, c("date"), function (x) apply(x[1], 2, sum))
 
+#Creating the histogram of the total number of steps taken each day
+#This histogram is slightly different from the previous one which was  
+#created before filling the NAs. This histogram has higher frequency around mean steps: 
+hist(newsm$steps, xlab= "Total Number of Steps/Day", 
+     main="Histogram of the Total Number of Steps Taken Each Day", 
+     col= "blue")
+
+#obtaining the mean of total steps after filling in all NAs:
+#the mean is exactly the same as before.
+#Imputing missing data did not have majore impact on 
+#the estimates of the total daily number of steps.
+mean(newsm$steps) # 10766.19
+#obtaining the median of total steps after filling in all NAs:
+#The median was increased very slightly and is now equal to the mean.
+#Imputing missing data did not have majore impact on 
+#the estimates of the total daily number of steps.
+median(newsm$steps) # 10766.19
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r the days of week, echo = TRUE}
+# Adding new column to the dataset "newData" containing the week days'names:
+newData$WD <- weekdays(as.Date(newData$date))
+# Replacing the names of week day with "Weekday" and "Weekend":
+newData$WD[newData$WD == "Friday"] <- "Weekday"
+newData$WD[newData$WD == "Monday"] <- "Weekday"
+newData$WD[newData$WD == "Thursday"] <- "Weekday"
+newData$WD[newData$WD == "Tuesday"] <- "Weekday"
+newData$WD[newData$WD == "Wednesday"] <- "Weekday"
+newData$WD[newData$WD == "Saturday"] <- "Weekend"
+newData$WD[newData$WD == "Sunday"] <- "Weekend"
+table(newData$WD)
+
+#Creating the panel plot containing a time series plot of the 5-min interval
+#and the average number of steps taken, averaged across all 
+#weekday days or weekend days.
+newmnsteps<- ddply(newData, c("interval", "WD"), function(x) apply(x[1], 2, mean))
+xyplot(newmnsteps$steps ~ newmnsteps$interval | newmnsteps$WD, 
+       type="l", ylab="Number of Steps", xlab="Interval",
+       main="Plot of Interval vs. Number of Steps", layout=c(1,2))
+```
